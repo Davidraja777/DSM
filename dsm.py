@@ -92,7 +92,7 @@ layout = [
     [sg.Text('TU Created:', size=(25, 1)), tu_created_input],
     [sg.Text('Running Number:', size=(25, 1)), running_number_input],
     [sg.Text('Check Out:', size=(25, 1)), check_out_input],
-    [add_record_button, update_record_button, sg.Button('View Records'), sg.Button('Exit')],
+    [add_record_button, update_record_button, sg.Button('View Records'), sg.Button('Search By Delivery Group'), sg.Button('Exit')],
 ]
 
 window = sg.Window('Record Keeper', layout, finalize=True, keep_on_top=True)
@@ -115,6 +115,44 @@ while True:
         if user in permissions['create']:
             add_record(user, values['-DELIVERY_GROUP-'], values['-TU_CREATED-'], values['-RUNNING_NUMBER-'], values['-CHECK_OUT-'])
             sg.popup('Record Added Successfully!', keep_on_top=True)
+
+    if event == 'Search By Delivery Group':
+        delivery_group_to_search = sg.popup_get_text('Enter Delivery Group Number:', title='Search By Delivery Group')
+        if not delivery_group_to_search:
+            continue
+    
+        # Load all records from all files
+        records = []
+        for year in range(2000, datetime.now().year + 1):  # Assuming records from the year 2000 onwards
+            for month in range(1, 13):
+                filename = f"records_{month}_{year}.json"
+                try:
+                    with open(filename, 'r') as file:
+                        month_records = json.load(file)
+                        records.extend(month_records)
+                except FileNotFoundError:
+                    continue
+                except json.JSONDecodeError:
+                    sg.popup_error(f"Error reading records for {calendar.month_name[month]} {year}!", keep_on_top=True)
+                    continue
+    
+        # Filter records based on the provided Delivery Group number
+        records = [record for record in records if record[2] == delivery_group_to_search]
+    
+        # Display the filtered records in the "View Records" window (same code as the 'View Records' event)
+        headers = ['Date', 'Created By', 'Delivery Group', 'TU Created', 'Running Number', 'Check Out', 'Updated By', 'Time Updated']
+        data = [[str(r[i]) for i in range(len(r))] for r in records]
+        view_layout = [
+            [sg.Table(values=data, headings=headers, display_row_numbers=False,
+                auto_size_columns=True, num_rows=min(10, len(data)),
+                justification='center', key='-TABLE-', enable_events=True,
+                bind_return_key=True, select_mode=sg.TABLE_SELECT_MODE_EXTENDED)],
+            [sg.Button('Edit', disabled=True), sg.Button('Select All'), sg.Button('Save To Excel'), sg.Button('Close')]
+        ]
+    
+        if view_window:
+            view_window.close()
+        view_window = sg.Window('View Records', view_layout, keep_on_top=True, finalize=True)
 
     if event == 'View Records':
         # Get the start date from the user
